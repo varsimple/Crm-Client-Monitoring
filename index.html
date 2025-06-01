@@ -45,17 +45,6 @@
             color: orange;
             font-weight: bold;
         }
-        .details {
-            display: none;
-            background-color: #f9f9f9;
-        }
-        .row-expanded .details {
-            display: table-row;
-        }
-        .edit-btn, .delete-btn, .info-btn {
-            cursor: pointer;
-            margin-right: 5px;
-        }
         #settings, #add-form, #filters, #modal {
             display: none;
             background-color: #f0f0f0;
@@ -75,6 +64,12 @@
             margin-bottom: 0.5rem;
             width: 100%;
         }
+        .note-input {
+            border: none;
+            width: 100%;
+            background: transparent;
+            font: inherit;
+        }
     </style>
 </head>
 <body>
@@ -87,9 +82,18 @@
     </div>
 </header>
 
-<div id="settings">...</div>
-<div id="filters">...</div>
-<div id="add-form">...</div>
+<div id="settings">Настройки здесь</div>
+<div id="filters">
+    <label>Статус:
+        <select onchange="applyFilter(this.value)">
+            <option value="">Все</option>
+            <option value="активный">Активный</option>
+            <option value="неактивный">Неактивный</option>
+            <option value="ждем">Ждем оплату</option>
+        </select>
+    </label>
+</div>
+<div id="add-form">Добавление формы тут</div>
 
 <table id="clients">
     <thead>
@@ -149,12 +153,12 @@
           <td><a href="${c.url}" target="_blank">${c.name}</a></td>
           <td>${c.contactName}<br>${c.phone}<br>${c.email}</td>
           <td class="status-${normalizeClass(c.status)}">${c.status}</td>
-          <td>${c.note}</td>
+          <td><input class="note-input" value="${c.note || ''}" onblur="updateNote('${c.id}', this.value)" /></td>
           <td>${c.lastDate} (${c.lastType})</td>
           <td>
             <span class="edit-btn" onclick="openModal(${i})">✏</span>
             <span class="delete-btn" onclick="deleteClient('${c.id}')">❌</span>
-            <span class="info-btn" onclick="alert('ИНН: ${c.inn || ''}\nКПП: ${c.kpp || ''}\nГород: ${c.city || ''}\nОКВЭД: ${c.okved || ''}')">ℹ</span>
+            <span class="info-btn" onclick="showInfo(${i})">ℹ</span>
           </td>`;
             tbody.appendChild(tr);
         });
@@ -191,6 +195,11 @@
         modal.style.display = 'block';
     }
 
+    function showInfo(index) {
+        const c = clients[index];
+        alert(`ИНН: ${c.inn || ''}\nКПП: ${c.kpp || ''}\nГород: ${c.city || ''}\nОКВЭД: ${c.okved || ''}`);
+    }
+
     function closeModal() {
         document.getElementById("modal").style.display = 'none';
     }
@@ -205,10 +214,19 @@
         });
     }
 
+    function updateNote(id, value) {
+        clientsRef.doc(id).update({ note: value });
+    }
+
     function deleteClient(id) {
         if (confirm("Удалить клиента?")) {
             clientsRef.doc(id).delete().then(() => fetchClients());
         }
+    }
+
+    function applyFilter(status) {
+        if (!status) return renderTable(clients);
+        renderTable(clients.filter(c => c.status === status));
     }
 
     fetchClients();
