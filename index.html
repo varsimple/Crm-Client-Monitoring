@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Личная CRM</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #fff;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #000;
+            color: #fff;
+            padding: 1rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 0.5rem;
+            text-align: left;
+        }
+        th {
+            background-color: #eee;
+            cursor: move;
+        }
+        .status-активный {
+            color: green;
+            font-weight: bold;
+        }
+        .status-неактивный {
+            color: gray;
+            font-weight: bold;
+        }
+        .status-ждем {
+            color: orange;
+            font-weight: bold;
+        }
+        .details {
+            display: none;
+            background-color: #f9f9f9;
+        }
+        .row-expanded .details {
+            display: table-row;
+        }
+        .edit-btn {
+            cursor: pointer;
+        }
+        #settings, #add-form, #filters {
+            display: none;
+            background-color: #f0f0f0;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Личная CRM</h1>
+    <div>
+        <button onclick="toggleElement('settings')">⚙ Настройки</button>
+        <button onclick="toggleElement('filters')">🔍 Фильтр</button>
+        <button onclick="toggleElement('add-form')">＋ Добавить</button>
+    </div>
+</header>
+
+<div id="settings">
+    <label>
+        Поднимать неактивных клиентов через:
+        <input type="number" id="daysInactive" value="30" /> дней
+    </label>
+    <label>
+        <input type="checkbox" id="autoSort" checked /> Автосортировка активных
+    </label>
+</div>
+
+<div id="filters">
+    <h3>Фильтрация</h3>
+    <label>Дата с: <input type="date" id="filterDateFrom" /></label>
+    <label>Дата по: <input type="date" id="filterDateTo" /></label>
+    <label>Город: <input type="text" id="filterCity" /></label>
+    <label>ОКВЭД: <input type="text" id="filterOkved" /></label>
+    <label>Статус:
+        <select id="filterStatus">
+            <option value="">Все</option>
+            <option value="активный">Активный</option>
+            <option value="неактивный">Неактивный</option>
+            <option value="ждем">Ждем оплату</option>
+        </select>
+    </label>
+    <button onclick="applyFilters()">Применить</button>
+</div>
+
+<div id="add-form">
+    <h3>Добавить клиента</h3>
+    <form id="client-form">
+        <input name="name" placeholder="Наименование" required />
+        <input name="url" placeholder="Сайт" required />
+        <input name="contactName" placeholder="Имя" required />
+        <input name="phone" placeholder="Телефон" required />
+        <input name="email" placeholder="Почта" required />
+        <select name="status">
+            <option value="активный">Активный</option>
+            <option value="неактивный">Неактивный</option>
+            <option value="ждем">Ждем оплату</option>
+        </select>
+        <input name="note" placeholder="Заметка" />
+        <input name="lastDate" type="date" required />
+        <select name="lastType">
+            <option value="звонок">Звонок</option>
+            <option value="почта">Почта</option>
+        </select>
+        <input name="inn" placeholder="ИНН" />
+        <input name="kpp" placeholder="КПП" />
+        <input name="city" placeholder="Город" />
+        <input name="okved" placeholder="ОКВЭД" />
+        <button type="submit">Добавить</button>
+    </form>
+</div>
+
+<table id="clients">
+    <thead>
+    <tr id="columns">
+        <th>Контрагент</th>
+        <th>Контакты</th>
+        <th>Статус</th>
+        <th>Заметки</th>
+        <th>Последнее взаимодействие</th>
+        <th>✏</th>
+    </tr>
+    </thead>
+    <tbody id="client-body"></tbody>
+</table>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyBHhhZ7q1_o7en1YY0HbgqX9533IeFfj14",
+        authDomain: "crm-client-monitor.firebaseapp.com",
+        projectId: "crm-client-monitor"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const clientsRef = db.collection("clients");
+
+    let clients = [];
+    let columnOrder = JSON.parse(localStorage.getItem("columnOrder") || "[]");
+
+    function toggleElement(id) {
+        const el = document.getElementById(id);
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function applyFilters() {
+        const from = document.getElementById("filterDateFrom").value;
+        const to = document.getElementById("filterDateTo").value;
+        const city = document.getElementById("filterCity").value.toLowerCase();
+        const okved = document.getElementById("filterOkved").value.toLowerCase();
+        const status = document.getElementById("filterStatus").value;
+
+        renderTable(clients.filter(c => {
+            if (from && new Date(c.lastDate) < new Date(from)) return false;
+            if (to && new Date(c.lastDate) > new Date(to)) return false;
+            if (city && (!c.city || !c.city.toLowerCase().includes(city))) return false;
+            if (okved && (!c.okved || !c.okved.toLowerCase().includes(okved))) return false;
+            if (status && c.status !== status) return false;
+            return true;
+        }));
+    }
+
+    function renderTable(data = clients) {
+        const tbody = document.getElementById("client-body");
+        tbody.innerHTML = "";
+
+        const autoSort = document.getElementById('autoSort').checked;
+        const days = parseInt(document.getElementById('daysInactive').value);
+        const now = new Date();
+
+        if (autoSort) {
+            data.sort((a, b) => {
+                const dateA = new Date(a.lastDate);
+                const dateB = new Date(b.lastDate);
+                const diffA = (now - dateA) / (1000 * 60 * 60 * 24);
+                const diffB = (now - dateB) / (1000 * 60 * 60 * 24);
+                if (a.status === 'активный' && diffA > days) return -1;
+                if (b.status === 'активный' && diffB > days) return 1;
+                return 0;
+            });
+        }
+
+        data.forEach((c, i) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+          <td><a href="${c.url}" target="_blank">${c.name}</a></td>
+          <td>${c.contactName}<br>${c.phone}<br>${c.email}</td>
+          <td class="status-${c.status}">${c.status}</td>
+          <td>${c.note}</td>
+          <td>${c.lastDate} (${c.lastType})</td>
+          <td><span class="edit-btn" onclick="editClient(${i})">✏</span></td>
+        `;
+            tr.onclick = () => tr.classList.toggle('row-expanded');
+
+            const detail = document.createElement("tr");
+            detail.classList.add('details');
+            detail.innerHTML = `<td colspan="6">ИНН: ${c.inn || ''} | КПП: ${c.kpp || ''} | Город: ${c.city || ''} | ОКВЭД: ${c.okved || ''}</td>`;
+
+            tbody.appendChild(tr);
+            tbody.appendChild(detail);
+        });
+    }
+
+    function fetchClients() {
+        clientsRef.get().then(snapshot => {
+            clients = [];
+            snapshot.forEach(doc => {
+                let data = doc.data();
+                data.id = doc.id;
+                clients.push(data);
+            });
+            renderTable();
+        });
+    }
+
+    document.getElementById("client-form").onsubmit = (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target));
+        clientsRef.add(data).then(() => {
+            fetchClients();
+            e.target.reset();
+        });
+    };
+
+    function editClient(index) {
+        const data = clients[index];
+        if (confirm("Редактировать запись?")) {
+            const note = prompt("Заметка:", data.note);
+            if (note !== null) {
+                clientsRef.doc(data.id).update({ note }).then(fetchClients);
+            }
+        }
+    }
+
+    let draggingCol;
+    document.querySelectorAll("th").forEach(th => {
+        th.draggable = true;
+        th.ondragstart = e => draggingCol = th;
+        th.ondragover = e => e.preventDefault();
+        th.ondrop = e => {
+            e.preventDefault();
+            if (draggingCol !== th) {
+                const row = th.parentNode;
+                row.insertBefore(draggingCol, th);
+                saveColumnOrder();
+            }
+        }
+    });
+
+    function saveColumnOrder() {
+        const headers = Array.from(document.querySelectorAll("#columns th"));
+        columnOrder = headers.map(h => h.textContent.trim());
+        localStorage.setItem("columnOrder", JSON.stringify(columnOrder));
+    }
+//h
+    window.onload = () => {
+        fetchClients();
+        if (columnOrder.length) {
+            const row = document.getElementById("columns");
+            const cols = Array.from(row.children);
+            columnOrder.forEach(title => {
+                const col = cols.find(th => th.textContent.trim() === title);
+                if (col) row.appendChild(col);
+            });
+        }
+    };
+</script>
+</body>
+</html>
+
+
