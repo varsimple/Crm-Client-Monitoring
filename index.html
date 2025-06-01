@@ -56,10 +56,24 @@
             cursor: pointer;
             margin-right: 5px;
         }
-        #settings, #add-form, #filters {
+        #settings, #add-form, #filters, #modal {
             display: none;
             background-color: #f0f0f0;
             padding: 1rem;
+        }
+        #modal {
+            position: fixed;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+        #modal form input, #modal form select {
+            display: block;
+            margin-bottom: 0.5rem;
+            width: 100%;
         }
     </style>
 </head>
@@ -73,59 +87,9 @@
     </div>
 </header>
 
-<div id="settings">
-    <label>
-        Поднимать неактивных клиентов через:
-        <input type="number" id="daysInactive" value="30" /> дней
-    </label>
-    <label>
-        <input type="checkbox" id="autoSort" checked /> Автосортировка активных
-    </label>
-</div>
-
-<div id="filters">
-    <h3>Фильтрация</h3>
-    <label>Дата с: <input type="date" id="filterDateFrom" /></label>
-    <label>Дата по: <input type="date" id="filterDateTo" /></label>
-    <label>Город: <input type="text" id="filterCity" /></label>
-    <label>ОКВЭД: <input type="text" id="filterOkved" /></label>
-    <label>Статус:
-        <select id="filterStatus">
-            <option value="">Все</option>
-            <option value="активный">Активный</option>
-            <option value="неактивный">Неактивный</option>
-            <option value="ждем">Ждем оплату</option>
-        </select>
-    </label>
-    <button onclick="applyFilters()">Применить</button>
-</div>
-
-<div id="add-form">
-    <h3>Добавить клиента</h3>
-    <form id="client-form">
-        <input name="name" placeholder="Наименование" required />
-        <input name="url" placeholder="Сайт" required />
-        <input name="contactName" placeholder="Имя" required />
-        <input name="phone" placeholder="Телефон" required />
-        <input name="email" placeholder="Почта" required />
-        <select name="status">
-            <option value="активный">Активный</option>
-            <option value="неактивный">Неактивный</option>
-            <option value="ждем">Ждем оплату</option>
-        </select>
-        <input name="note" placeholder="Заметка" />
-        <input name="lastDate" type="date" required />
-        <select name="lastType">
-            <option value="звонок">Звонок</option>
-            <option value="почта">Почта</option>
-        </select>
-        <input name="inn" placeholder="ИНН" />
-        <input name="kpp" placeholder="КПП" />
-        <input name="city" placeholder="Город" />
-        <input name="okved" placeholder="ОКВЭД" />
-        <button type="submit">Добавить</button>
-    </form>
-</div>
+<div id="settings">...</div>
+<div id="filters">...</div>
+<div id="add-form">...</div>
 
 <table id="clients">
     <thead>
@@ -135,75 +99,28 @@
         <th>Статус</th>
         <th>Заметки</th>
         <th>Последнее взаимодействие</th>
-        <th>✏ / ❌</th>
+        <th>✏ / ❌ / ℹ</th>
     </tr>
     </thead>
     <tbody id="client-body"></tbody>
 </table>
 
+<div id="modal"></div>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
 <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyBHhhZ7q1_o7en1YY0HbgqX9533IeFfj14",
-        authDomain: "crm-client-monitor.firebaseapp.com",
-        projectId: "crm-client-monitor"
-    };
-
+    // Firebase config & init
+    const firebaseConfig = { ... };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const clientsRef = db.collection("clients");
-
     let clients = [];
-
-    function toggleElement(id) {
-        const el = document.getElementById(id);
-        el.style.display = el.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function applyFilters() {
-        const from = document.getElementById("filterDateFrom").value;
-        const to = document.getElementById("filterDateTo").value;
-        const city = document.getElementById("filterCity").value.toLowerCase();
-        const okved = document.getElementById("filterOkved").value.toLowerCase();
-        const status = document.getElementById("filterStatus").value;
-
-        renderTable(clients.filter(c => {
-            if (from && new Date(c.lastDate) < new Date(from)) return false;
-            if (to && new Date(c.lastDate) > new Date(to)) return false;
-            if (city && (!c.city || !c.city.toLowerCase().includes(city))) return false;
-            if (okved && (!c.okved || !c.okved.toLowerCase().includes(okved))) return false;
-            if (status && c.status !== status) return false;
-            return true;
-        }));
-    }
-
-    function normalizeClass(str) {
-        return str.toLowerCase().replace(/\s+/g, '-').replace(/[^a-zа-я0-9\-]/gi, '');
-    }
 
     function renderTable(data = clients) {
         const tbody = document.getElementById("client-body");
         tbody.innerHTML = "";
-
-        const autoSortElement = document.getElementById('autoSort');
-        const daysElement = document.getElementById('daysInactive');
-        const autoSort = autoSortElement ? autoSortElement.checked : false;
-        const days = daysElement ? parseInt(daysElement.value) : 30;
-        const now = new Date();
-
-        if (autoSort) {
-            data.sort((a, b) => {
-                const dateA = new Date(a.lastDate);
-                const dateB = new Date(b.lastDate);
-                const diffA = (now - dateA) / (1000 * 60 * 60 * 24);
-                const diffB = (now - dateB) / (1000 * 60 * 60 * 24);
-                if (a.status === 'активный' && diffA > days) return -1;
-                if (b.status === 'активный' && diffB > days) return 1;
-                return 0;
-            });
-        }
 
         data.forEach((c, i) => {
             const tr = document.createElement("tr");
@@ -214,20 +131,59 @@
           <td>${c.note}</td>
           <td>${c.lastDate} (${c.lastType})</td>
           <td>
-            <span class="edit-btn" onclick="editClient(${i})">✏</span>
+            <span class="edit-btn" onclick="openModal(${i})">✏</span>
             <span class="delete-btn" onclick="deleteClient(${i})">❌</span>
-          </td>
-        `;
-            tr.onclick = () => tr.classList.toggle('row-expanded');
-
-            const detail = document.createElement("tr");
-            detail.classList.add('details');
-            detail.innerHTML = `<td colspan="6">ИНН: ${c.inn || ''} | КПП: ${c.kpp || ''} | Город: ${c.city || ''} | ОКВЭД: ${c.okved || ''}</td>`;
-
+            <span class="info-btn" onclick="alert('ИНН: ${c.inn || ''}\nКПП: ${c.kpp || ''}\nГород: ${c.city || ''}\nОКВЭД: ${c.okved || ''}')">ℹ</span>
+          </td>`;
             tbody.appendChild(tr);
-            tbody.appendChild(detail);
         });
     }
+
+    function openModal(index) {
+        const c = clients[index];
+        const modal = document.getElementById("modal");
+        modal.innerHTML = `<h3>Редактирование</h3>
+        <form onsubmit="submitEdit(event, '${c.id}')">
+          <input name="name" value="${c.name}" required />
+          <input name="url" value="${c.url}" required />
+          <input name="contactName" value="${c.contactName}" />
+          <input name="phone" value="${c.phone}" />
+          <input name="email" value="${c.email}" />
+          <select name="status">
+            <option value="активный" ${c.status==='активный'?'selected':''}>Активный</option>
+            <option value="неактивный" ${c.status==='неактивный'?'selected':''}>Неактивный</option>
+            <option value="ждем" ${c.status==='ждем'?'selected':''}>Ждем оплату</option>
+          </select>
+          <input name="note" value="${c.note}" />
+          <input name="lastDate" type="date" value="${c.lastDate}" required />
+          <select name="lastType">
+            <option value="звонок" ${c.lastType==='звонок'?'selected':''}>Звонок</option>
+            <option value="почта" ${c.lastType==='почта'?'selected':''}>Почта</option>
+          </select>
+          <input name="inn" value="${c.inn}" />
+          <input name="kpp" value="${c.kpp}" />
+          <input name="city" value="${c.city}" />
+          <input name="okved" value="${c.okved}" />
+          <button type="submit">Сохранить</button>
+          <button type="button" onclick="closeModal()">Закрыть</button>
+        </form>`;
+        modal.style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById("modal").style.display = 'none';
+    }
+
+    function submitEdit(e, id) {
+        e.preventDefault();
+        const form = e.target;
+        const data = Object.fromEntries(new FormData(form));
+        clientsRef.doc(id).update(data).then(() => {
+            closeModal();
+            fetchClients();
+        });
+    }
+
 
     function fetchClients() {
         clientsRef.get().then(snapshot => {
