@@ -1,22 +1,246 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="styles.css" />
-    <title>CRM на Firestore (ESM)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>НТВ</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: Arial, sans-serif; background: #fff; color: #222; line-height: 1.5;
+    }
+    header {
+      background: #43a638; color: #fff; text-align: center; padding: 16px 0; font-weight: bold; font-size: 24px; letter-spacing: 2px;
+    }
+    #feed {
+      max-width: 600px; margin: 20px auto; padding: 0 10px;
+    }
+    article {
+      margin-bottom: 48px; border-bottom: 1px solid #ccc; padding-bottom: 24px;
+    }
+    article h2 {
+      font-size: 22px; margin-bottom: 12px;
+    }
+    article img.post-image {
+      width: 100%; border-radius: 8px; margin-bottom: 16px; object-fit: cover;
+    }
+    article p {
+      margin-bottom: 16px; font-size: 24px; white-space: pre-line;
+    }
+    .ad-block {
+      margin: 16px 0;
+      border: 2px solid #888;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: left;
+    }
+    .ad-block img {
+      width: 100%; max-width: 500px; border-radius: 8px; cursor: pointer; transition: transform 0.3s ease;
+    }
+    .ad-block img:hover {
+      transform: scale(1.05);
+    }
+    .vertical__wrap-content {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .vertical__title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #222;
+      margin: 0;
+      text-align: left;
+    }
+    .indent {
+      height: 6px;
+    }
+    .vertical__bottom {
+      font-size: 14px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 6px;
+    }
+    .vertical__bottom i {
+      margin-right: 4px;
+    }
+    #loading {
+      text-align: center; color: #555; padding: 12px; font-size: 16px;
+    }
+    @media (max-width: 640px) {
+      #feed {
+        max-width: 100%; padding: 0 15px;
+      }
+      article h2 {
+        font-size: 20px;
+      }
+      article p {
+        font-size: 15px;
+      }
+      .ad-block img {
+        max-width: 100%;
+      }
+    }
+  </style>
 </head>
 <body>
-<!-- Контейнеры для логина и основного приложения -->
-<div id="auth-container">
-    <h2>Здесь будет форма логина</h2>
-</div>
+<header>ЛЕНТА НОВОСТЕЙ НТВ</header>
+<div id="feed"></div>
+<div id="loading">Загрузка...</div>
 
-<div id="app-container" class="hidden">
-    <h2>CRM приложение запущено!</h2>
-</div>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const post = {
+      title: "Опубликованы списки россиян, которым доступна выплата от государства. Новости России.",
+      image: "https://backendurance.com/images/news/rectangular/26f16230fee48046a7ac54d8d23b8cc7.jpg",
+      content: `На счет, привязанный к карте, будут перечислять в среднем по 10 тысяч рублей. И многим эти деньги поступят уже с 1 августа. Об этом рассказал финансовый эксперт Валерий Попов сообщает.
 
-<!-- Один ES-модульный скрипт -->
-<script type="module" src="app.js"></script>
+По его словам, рассчитывать на новые деньги в ближайшее время смогут жители всех российских регионов. Главным условием будет наличие банковской карты «Мир». При этом такая карта должна быть зарегистрирована в программе лояльности. Никаких ограничений по уровню дохода или по возрасту не предусмотрено.
+
+Выплата будет начисляться в рамках социальной программы, которая организована национальной платежной системой вместе с партнерами. Деньги получит каждый, кто решится на путешествие по России. Для этого нужно будет забронировать проживание в отеле на популярном сервисе для организации путешествий и оплатить поездку картой «Мир».
+
+«В рамках такой программы на счет каждому, кто будет оплачивать бронирование, вернется часть денег от покупки. Для стандартных карт размер возврата составит восемь процентов, а для премиальных банковских карт национальной платежной системы объем кешбэка будет уже на уровне десяти процентов», – отметил Попов.
+
+Отмечается, что денежные средства будут приходить на карты не ранее трех рабочих дней с момента оплаты. В среднем же организаторы обещают начислить бонус в течение пяти-семи рабочих дней. То есть многим деньги поступят на счет уже с 12 августа. И во многих случаях это будет 10 тысяч рублей или даже чуть больше.
+`
+    };
+
+    const adsImages = [
+      {
+        image: "https://pc8oeqtzy9.com/videos/ef/2a/ef2aefd3-5727-4af7-b6e2-dcd6a57c2f77_rectangle.webp",
+        description: "Зарабатывайте от 100 000 рублей в неделю с помощью этой платформы!"
+      },
+      {
+        image: "https://pc8oeqtzy9.com/images/91/3c/913cf242-f2c7-471a-b8ca-39979460b1a8.jpg",
+        description: "Предсказание на июль ошарашило Россию. жми на свой зодиак!"
+      },
+      {
+        image: "https://pc8oeqtzy9.com/images/b4/23/b423a03f-2347-498f-96d3-a7af682eb64f.jpg",
+        description: "Муж оставил жену и собак дома одних! Когла он внезнапно вернулся - чуть не потерял дар речи..."
+      },
+      {
+        image: "https://pc8oeqtzy9.com/videos/4f/fd/4ffd7d18-98d4-4a1a-8842-9469277c4985_rectangle.webp",
+        description: "Нажми на медведя, который бежит в другую сторону и получи 115 000 рублей себе на счёт."
+      },
+      {
+        image: "https://proactions.ru/_ipx/f_jpeg,s_1536x922/https://proactions.ru/media/actions/2024/10/07/wildberriesru.jpg",
+        description: "WB раздает призы месяца. Успей забрать свой приз, жми!"
+      },
+      {
+        image: "https://i.ytimg.com/vi/ZdTFe78KGoY/maxresdefault.jpg",
+        description: "20 лет wildberries! Раздача крупных призов, каждому скидка 70% на одежду, спеши!"
+      },
+      {
+        image: "https://sun9-37.userapi.com/s/v1/ig2/UZ3RpNMZkCGoI78gNPd7QLsbfeY49W_ME_PeR9IUwkf80lYnh7BEoKYtLQKmdg2-xHJ7K62MNFaBwlnzjdfVFYCo.jpg?quality=95&as=32x38,48x57,72x85,108x128,160x189,240x283,360x425,480x567,540x638,640x756,720x850,879x1038&from=bu&cs=640x0",
+        description: "Получи сертификат на 5000 рублей зайдя на Wildberries! Количество ограничено, жми!"
+      },
+      {
+        image: "https://neftekamsk.toto-rolls.ru/upload/df268574-8ba6-f338-4698-683c9ceecd01_image_c",
+        description: "Хочешь 50 000 рублей? Прими участие в розыгрыше. Результаты сразу же, переходи скорее, жми!"
+      },
+    ];
+
+    function getRandomIndex(arr) {
+      return Math.floor(Math.random() * arr.length);
+    }
+
+    function createRandomAd() {
+      const ad = adsImages[getRandomIndex(adsImages)];
+
+      const adLink = document.createElement("a");
+      adLink.href = "https://google.com";
+      adLink.target = "_blank";
+      adLink.rel = "noopener noreferrer";
+
+      const adDiv = document.createElement("div");
+      adDiv.className = "ad-block";
+
+      const adImg = document.createElement("img");
+      adImg.src = ad.image;
+      adImg.alt = "advertisement";
+      adDiv.appendChild(adImg);
+
+      const wrapContent = document.createElement("div");
+      wrapContent.className = "vertical__wrap-content";
+
+      const title = document.createElement("h5");
+      title.className = "vertical__title";
+      title.textContent = ad.description;
+      wrapContent.appendChild(title);
+
+      const indent = document.createElement("div");
+      indent.className = "indent";
+      wrapContent.appendChild(indent);
+
+      const bottom = document.createElement("div");
+      bottom.className = "vertical__bottom";
+
+      const icon = document.createElement("i");
+      icon.className = "fa fa-calendar-o";
+      bottom.appendChild(icon);
+
+      const hoursAgo = Math.floor(Math.random() * 24) + 1;
+      const dateSpan = document.createElement("span");
+      dateSpan.className = "vertical__date";
+      dateSpan.textContent = `${hoursAgo} часов назад`;
+      bottom.appendChild(dateSpan);
+
+      wrapContent.appendChild(bottom);
+      adDiv.appendChild(wrapContent);
+      adLink.appendChild(adDiv);
+
+      return adLink;
+    }
+
+    const feed = document.getElementById("feed");
+
+    function createPostWithAds(post) {
+      const article = document.createElement("article");
+
+      const h2 = document.createElement("h2");
+      h2.textContent = post.title;
+      article.appendChild(h2);
+
+      const img = document.createElement("img");
+      img.src = post.image;
+      img.alt = "post image";
+      img.className = "post-image";
+      article.appendChild(img);
+
+      const paragraphs = post.content.split("\n\n");
+
+      paragraphs.forEach((para) => {
+        const p = document.createElement("p");
+        p.textContent = para;
+        article.appendChild(p);
+
+        const adBlock = createRandomAd();
+        article.appendChild(adBlock);
+      });
+
+      return article;
+    }
+
+    function loadMoreAds() {
+      const adBlock = createRandomAd();
+      feed.appendChild(adBlock);
+    }
+
+    feed.appendChild(createPostWithAds(post));
+
+    window.addEventListener("scroll", () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
+        loadMoreAds();
+      }
+    });
+
+    loadMoreAds();
+    loadMoreAds();
+  });
+</script>
 </body>
 </html>
